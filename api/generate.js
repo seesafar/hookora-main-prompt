@@ -1,5 +1,30 @@
 module.exports = async (req, res) => {
   try {
+
+    // 1️⃣ تحقق من نوع الطلب
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed. Use POST." });
+    }
+
+    // 2️⃣ 🔐 تحقق من المفتاح الداخلي
+    const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+    const clientKey = req.headers["x-api-key"];
+
+    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // 3️⃣ بعدها يكمل الكود الطبيعي
+    const { prompt, idea } = req.body || {};
+    const userInput = prompt || idea;
+
+    if (!userInput) {
+      return res.status(400).json({ error: "No prompt provided" });
+    }
+
+    // باقي الكود...
+module.exports = async (req, res) => {
+  try {
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed. Use POST." });
     }
