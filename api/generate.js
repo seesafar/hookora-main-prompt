@@ -1,4 +1,27 @@
 module.exports = async (req, res) => {
+
+  // 🔐 حماية الـ API
+  const apiKey = req.headers["x-api-key"];
+  const internalKey = process.env.INTERNAL_API_KEY;
+
+  if (!apiKey || apiKey !== internalKey) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // منع GET
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
+  }
+
+  try {
+    const { prompt } = req.body || {};
+
+    if (!prompt) {
+      return res.status(400).json({ error: "No prompt provided" });
+    }
+
+    // باقي كود OpenAI هنا...
+module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
