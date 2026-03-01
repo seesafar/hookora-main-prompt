@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/generate.js": {
+    "api/**/*.js": {
       "runtime": "nodejs20.x"
     }
   }
