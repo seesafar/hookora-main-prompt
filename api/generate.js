@@ -1,22 +1,17 @@
 module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
+  }
+
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed. Use POST." });
-    }
-
-    // Vercel sometimes gives body as string
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const idea = body.idea;
-
-    if (!idea) {
-      return res.status(400).json({ error: "Missing 'idea' in request body." });
-    }
+    const { idea } = req.body || {};
+    if (!idea) return res.status(400).json({ error: "No idea provided" });
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
@@ -41,11 +36,11 @@ Output only the final script.`,
 
     const script =
       data.output_text ||
-      (data.output && data.output[0]?.content?.[0]?.text) ||
+      data.output?.[0]?.content?.[0]?.text ||
       "No script generated.";
 
     return res.status(200).json({ script });
   } catch (err) {
-    return res.status(500).json({ error: "Server error", details: String(err) });
+    return res.status(500).json({ error: "Something went wrong" });
   }
 };
