@@ -85,16 +85,7 @@ module.exports = async (req, res) => {
         : "") ||
       "";
 
-    // Debug مؤقت: يساعدنا لو طلع فاضي (احذفه لاحقًا بعد التأكد)
-    return res.status(200).json({
-      script,
-      debug: {
-        has_output_text: typeof data.output_text === "string",
-        output_text_len: typeof data.output_text === "string" ? data.output_text.length : 0,
-        has_output: Array.isArray(data.output),
-        output_len: Array.isArray(data.output) ? data.output.length : 0,
-      },
-    });
+    return res.status(200).json({ script });
   } catch (err) {
     console.error("API /generate error:", err);
     return res.status(500).json({
