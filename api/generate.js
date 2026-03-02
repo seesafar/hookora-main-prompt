@@ -1,13 +1,27 @@
 module.exports = async (req, res) => {
-  // 1) السماح فقط POST
+  // ✅ CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, x-public-key, x-api-key"
+  );
+
+  // ✅ Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ✅ السماح فقط POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
 
   try {
-    // 2) مفاتيح البيئة (Vercel)
+    // ✅ مفاتيح البيئة (Vercel)
     const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
     const PUBLIC_API_KEY = process.env.PUBLIC_API_KEY;
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
     if (!INTERNAL_API_KEY) {
       return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
@@ -17,7 +31,11 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: "Missing PUBLIC_API_KEY in env" });
     }
 
-    // 3) التحقق: داخلي أو عام
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: "Missing OPENAI_API_KEY in env" });
+    }
+
+    // ✅ التحقق: داخلي أو عام
     const internalKey = req.headers["x-api-key"];
     const publicKey = req.headers["x-public-key"];
 
@@ -28,7 +46,7 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // 4) التقط المدخل: prompt أو idea
+    // ✅ التقط المدخل: prompt أو idea
     const { prompt, idea } = req.body || {};
     const userInput = (prompt || idea || "").trim();
 
@@ -36,13 +54,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "No prompt provided" });
     }
 
-    // 5) تحقق من مفتاح OpenAI
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: "Missing OPENAI_API_KEY in env" });
-    }
-
-    // 6) نداء OpenAI (Responses API)
+    // ✅ نداء OpenAI (Responses API)
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -69,26 +81,12 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 7) استخراج النص من Responses API بأكثر من مسار
+    // ✅ استخراج النص من Responses API
     const script =
       (typeof data.output_text === "string" && data.output_text.trim()) ||
       (data?.output?.[0]?.content
         ?.find((c) => c?.type === "output_text" && typeof c?.text === "string")
         ?.text?.trim()) ||
-      (Array.isArray(data?.output)
-        ? data.output
-            .map((o) =>
-              Array.isArray(o?.content)
-                ? o.content
-                    .map((c) => (typeof c?.text === "string" ? c.text : ""))
-                    .filter(Boolean)
-                    .join("\n")
-                : ""
-            )
-            .filter(Boolean)
-            .join("\n")
-            .trim()
-        : "") ||
       "";
 
     return res.status(200).json({ script });
