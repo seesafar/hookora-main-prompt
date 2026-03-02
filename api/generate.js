@@ -4,7 +4,7 @@ module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, x-public-key, x-api-key"
+    "Content-Type, x-api-key"
   );
 
   // ✅ Preflight
@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
-  // ✅ السماح فقط POST
+  // ✅ POST فقط
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
@@ -20,29 +20,19 @@ module.exports = async (req, res) => {
   try {
     // ✅ مفاتيح البيئة (Vercel)
     const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
-    const PUBLIC_API_KEY = process.env.PUBLIC_API_KEY;
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
     if (!INTERNAL_API_KEY) {
       return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
     }
 
-    if (!PUBLIC_API_KEY) {
-      return res.status(500).json({ error: "Missing PUBLIC_API_KEY in env" });
-    }
-
     if (!OPENAI_API_KEY) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY in env" });
     }
 
-    // ✅ التحقق: داخلي أو عام
-    const internalKey = req.headers["x-api-key"];
-    const publicKey = req.headers["x-public-key"];
-
-    const isInternal = internalKey && internalKey === INTERNAL_API_KEY;
-    const isPublic = publicKey && publicKey === PUBLIC_API_KEY;
-
-    if (!isInternal && !isPublic) {
+    // ✅ التحقق من المفتاح الداخلي (فقط)
+    const clientKey = req.headers["x-api-key"];
+    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -65,8 +55,13 @@ module.exports = async (req, res) => {
         model: "gpt-4.1-mini",
         input: [
           {
+            role: "system",
+            content:
+              "You are an expert direct-response advertising copywriter. Write a high-converting 30-45 second video ad script. Structure it: 1) Hook 2) Problem/Desire 3) Solution 4) Benefits 5) Strong CTA. Output only the final script.",
+          },
+          {
             role: "user",
-            content: `اكتب سكربت إعلان تسويقي احترافي بناءً على الطلب التالي:\n\n${userInput}\n\nأرجع النتيجة كنص واحد جاهز للنشر.`,
+            content: userInput,
           },
         ],
       }),
