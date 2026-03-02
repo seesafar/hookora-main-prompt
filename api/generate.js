@@ -11,6 +11,7 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
     }
 
+    // ملاحظة: في Node/Vercel قد تأتي الهيدرز بحروف صغيرة دائمًا
     const clientKey = req.headers["x-api-key"];
     if (!clientKey || clientKey !== INTERNAL_API_KEY) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -18,7 +19,7 @@ module.exports = async (req, res) => {
 
     // 3) التقط المدخل: prompt أو idea
     const { prompt, idea } = req.body || {};
-    const userInput = prompt || idea;
+    const userInput = (prompt || idea || "").trim();
 
     if (!userInput) {
       return res.status(400).json({ error: "No prompt provided" });
@@ -39,7 +40,13 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: `اكتب سكربت إعلان تسويقي احترافي بناءً على الطلب التالي:\n\n${userInput}\n\nأرجع النتيجة كنص واحد جاهز للنشر.`,
+        // نخليها منظمة أكثر
+        input: [
+          {
+            role: "user",
+            content: `اكتب سكربت إعلان تسويقي احترافي بناءً على الطلب التالي:\n\n${userInput}\n\nأرجع النتيجة كنص واحد جاهز للنشر.`,
+          },
+        ],
       }),
     });
 
@@ -53,10 +60,41 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Responses API: النص عادة في output_text
-    const script = data.output_text || "";
+    // 6) استخراج النص من Responses API بأكثر من مسار (توافق عالي)
+    const script =
+      // بعض الردود توفر output_text جاهز
+      (typeof data.output_text === "string" && data.output_text.trim()) ||
+      // كثير من ردود Responses API تكون داخل output[0].content[type=output_text].text
+      (data?.output?.[0]?.content
+        ?.find((c) => c?.type === "output_text" && typeof c?.text === "string")
+        ?.text?.trim()) ||
+      // تجميع أي نصوص موجودة داخل output -> content -> text
+      (Array.isArray(data?.output)
+        ? data.output
+            .map((o) =>
+              Array.isArray(o?.content)
+                ? o.content
+                    .map((c) => (typeof c?.text === "string" ? c.text : ""))
+                    .filter(Boolean)
+                    .join("\n")
+                : ""
+            )
+            .filter(Boolean)
+            .join("\n")
+            .trim()
+        : "") ||
+      "";
 
-    return res.status(200).json({ script });
+    // Debug مؤقت: يساعدنا لو طلع فاضي (احذفه لاحقًا بعد التأكد)
+    return res.status(200).json({
+      script,
+      debug: {
+        has_output_text: typeof data.output_text === "string",
+        output_text_len: typeof data.output_text === "string" ? data.output_text.length : 0,
+        has_output: Array.isArray(data.output),
+        output_len: Array.isArray(data.output) ? data.output.length : 0,
+      },
+    });
   } catch (err) {
     console.error("API /generate error:", err);
     return res.status(500).json({
