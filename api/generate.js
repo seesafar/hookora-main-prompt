@@ -30,11 +30,18 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY in env" });
     }
 
-    // ✅ التحقق من المفتاح الداخلي (فقط)
-    const clientKey = req.headers["x-api-key"];
-    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const clientKey =
+  req.headers["x-api-key"] ||
+  req.headers["x_api_key"] ||
+  req.headers["X-API-KEY"] ||
+  req.headers["x-public-key"];
+
+if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) {
+  return res.status(401).json({
+    error: "Unauthorized",
+    got: clientKey ? String(clientKey) : null
+  });
+}
 
     // ✅ التقط المدخل: prompt أو idea
     const { prompt, idea } = req.body || {};
