@@ -24,12 +24,14 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
     }
 
-    // ✅ ينادي نفس الدومين الحالي (Production/Preview) تلقائياً
-    const proto = req.headers["x-forwarded-proto"] || "https";
-    const host = req.headers.host;
-    const baseUrl = `${proto}://${host}`;
-
-    const r = await fetch(baseUrl + "/api/generate", {
+   const r = await fetch("https://hookora-main-prompt-l4mm.vercel.app/api/generate", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": INTERNAL_API_KEY
+  },
+  body: JSON.stringify({ idea: userInput, seconds: safeSeconds })
+});
       method: "POST",
       headers: {
         "Content-Type": "application/json",
