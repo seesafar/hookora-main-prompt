@@ -44,9 +44,11 @@ if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) 
 }
 
     // ✅ التقط المدخل: prompt أو idea
-    const { prompt, idea } = req.body || {};
+    const { prompt, idea, seconds } = req.body || {};
     const userInput = (prompt || idea || "").trim();
-
+   // مدة الفيديو من السلايدر (5 إلى 45 ثانية)
+    const s = Number(seconds);
+    const safeSeconds = Number.isFinite(s) ? Math.min(45, Math.max(5, s)) : 30;
     if (!userInput) {
       return res.status(400).json({ error: "No prompt provided" });
     }
@@ -63,8 +65,19 @@ if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) 
         input: [
           {
             role: "system",
-            content:
-              "You are an expert direct-response advertising copywriter. Write a high-converting 30-45 second video ad script. Structure it: 1) Hook 2) Problem/Desire 3) Solution 4) Benefits 5) Strong CTA. Output only the final script.",
+           content:
+            `You are an expert direct-response advertising copywriter.  
+           Write a high-converting ${safeSeconds}-second video ad script.
+
+           Structure:
+           1) Hook
+           2) Problem/Desire
+           3) Solution
+           4) Benefits
+           5) Strong CTA
+
+Make the script fit approximately ${safeSeconds} seconds of spoken video.
+Output only the final script.`,
           },
           {
             role: "user",
