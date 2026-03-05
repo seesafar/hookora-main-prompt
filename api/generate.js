@@ -65,13 +65,14 @@ if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) 
         input: [
           {
             {
+{
   role: "system",
   content: `
 You are an expert short-form video ad scriptwriter.
 Write a ${safeSeconds}-second video ad script based on the user's idea.
 
 OUTPUT FORMAT (very important):
-Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
+Return ONLY valid JSON with this structure:
 
 {
   "duration_seconds": ${safeSeconds},
@@ -82,14 +83,17 @@ Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
       "label": "HOOK | PROBLEM | SOLUTION | BENEFITS | CTA",
       "on_screen_text": "Short on-screen text (max 12 words)",
       "voiceover": "Spoken line(s) for this scene",
-      "visuals": "What should appear visually in the scene",
+      "visuals": "What should appear visually",
       "sfx_music": "Optional music or sound suggestion"
     }
   ]
 }
 `
+},
+{
+  role: "user",
+  content: userInput
 }
-
 Rules:
 - Total scene timing must start at 0 and end exactly at ${safeSeconds}.
 - Use between 3 and 7 scenes.
