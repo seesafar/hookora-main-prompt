@@ -1,8 +1,8 @@
 module.exports = async (req, res) => {
-  // CORS
+  // ✅ CORS (واجهة Webflow ما ترسل x-api-key)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
@@ -10,85 +10,43 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Auth (internal only)
-    const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
-    const clientKey = req.headers["x-api-key"];
-
-    if (!INTERNAL_API_KEY) {
-      return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
-    }
-    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    // OpenAI key
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: "Missing OPENAI_API_KEY in env" });
-    }
-
-    // Input
     const { idea, prompt, seconds } = req.body || {};
     const userInput = String(prompt || idea || "").trim();
+
     if (!userInput) return res.status(400).json({ error: "No prompt provided" });
 
     const s = Number(seconds);
     const safeSeconds = Number.isFinite(s) ? Math.min(45, Math.max(5, s)) : 30;
 
-    // Build prompt
-    const system =
-      "You are a professional direct-response video ad scriptwriter. " +
-      "Return a clean, ready-to-read script with: Hook, Problem, Solution, Benefits, CTA. " +
-      "No markdown. No quotes. Keep it punchy.";
-    const user =
-      `Write a ${safeSeconds}-second video ad script about:\n` +
-      `${userInput}\n` +
-      `Target language: English.\n` +
-      `Make it conversion-focused.`;
+    // 🔐 المفتاح يبقى داخل Vercel فقط
+    const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+    if (!INTERNAL_API_KEY) {
+      return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
+    }
 
-    // Call OpenAI REST (no SDK)
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    // ✅ ينادي نفس الدومين الحالي (Production/Preview) تلقائياً
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers.host;
+    const baseUrl = `${proto}://${host}`;
+
+    const r = await fetch(baseUrl + "/api/generate", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
+        "x-api-key": INTERNAL_API_KEY,
       },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature: 0.7,
-      }),
+      body: JSON.stringify({ idea: userInput, seconds: safeSeconds }),
     });
 
-    const textRaw = await resp.text(); // مهم جدًا عشان لو مو JSON
+    const raw = await r.text();
     let data;
-    try {
-      data = JSON.parse(textRaw);
-    } catch {
-      data = { raw: textRaw };
-    }
+    try { data = JSON.parse(raw); } catch { data = { raw }; }
 
-    if (!resp.ok) {
-      console.error("OpenAI error:", resp.status, data);
-      return res.status(500).json({
-        error: "OpenAI request failed",
-        status: resp.status,
-        details: data,
-      });
-    }
+    // يرجع نفس حالة generate (200/400/500..)
+    return res.status(r.status).json(data);
 
-    const out = data?.choices?.[0]?.message?.content?.trim();
-    if (!out) {
-      console.error("Empty completion:", data);
-      return res.status(500).json({ error: "Empty completion from OpenAI" });
-    }
-
-    return res.status(200).json({ text: out, seconds: safeSeconds });
   } catch (err) {
-    console.error("API /generate crash:", err);
+    console.error("API /public-generate crash:", err);
     return res.status(500).json({
       error: "Internal Server Error",
       message: err?.message || String(err),
