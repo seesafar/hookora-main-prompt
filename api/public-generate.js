@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
 
     // نداء generate (محمي)
     const url = "https://hookora-main-prompt-l4mm.vercel.app/api/generate";
-    const r = await _fetchFn(url, {
+    const r = await fetchFn(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
