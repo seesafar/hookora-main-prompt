@@ -1,97 +1,52 @@
+const fetchFn =
+  globalThis.fetch ||
+  ((...args) => import("node-fetch").then(({ default: f }) => f(...args)));
+
 module.exports = async (req, res) => {
-  // ✅ CORS
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, x-api-key"
-  );
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-  // ✅ Preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // ✅ POST فقط
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
 
   try {
-    // ✅ مفاتيح البيئة (Vercel)
+    // حماية داخلية
     const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const clientKey = req.headers["x-api-key"];
 
     if (!INTERNAL_API_KEY) {
       return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
     }
 
+    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // مفتاح OpenAI
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY in env" });
     }
 
-    const clientKey =
-  req.headers["x-api-key"] ||
-  req.headers["x_api_key"] ||
-  req.headers["X-API-KEY"] ||
-  req.headers["x-public-key"];
+    // الإدخال
+    const { idea, prompt, seconds } = req.body || {};
+    const userInput = String(prompt || idea || "").trim();
 
-if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) {
-  return res.status(401).json({
-    error: "Unauthorized",
-    got: clientKey ? String(clientKey) : null
-  });
-}
-
-    // ✅ التقط المدخل: prompt أو idea
-    const { prompt, idea, seconds } = req.body || {};
-    const userInput = (prompt || idea || "").trim();
-   // مدة الفيديو من السلايدر (5 إلى 45 ثانية)
-    const s = Number(seconds);
-    const safeSeconds = Number.isFinite(s) ? Math.min(45, Math.max(5, s)) : 30;
     if (!userInput) {
       return res.status(400).json({ error: "No prompt provided" });
     }
 
-    // ✅ نداء OpenAI (Responses API)
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-       input: [
-  {
-  role: "system",
-  content: `You are an expert short-form video ad scriptwriter.
-Write a ${safeSeconds}-second video ad script based on the user's idea.
+    const s = Number(seconds);
+    const safeSeconds = Number.isFinite(s) ? Math.min(45, Math.max(5, s)) : 30;
 
-OUTPUT FORMAT (very important):
-Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
-
-{
-  "duration_seconds": ${safeSeconds},
-  "scenes": [
-    {
-      "start": 0,
-      "end": ${safeSeconds},
-      "label": "HOOK | PROBLEM | SOLUTION | BENEFITS | CTA",
-      "on_screen_text": "Short on-screen text (max 12 words)",
-      "voiceover": "Spoken line(s) for this scene",
-      "visuals": "What should appear visually in the scene",
-      "sfx_music": "Optional music or sound suggestion"
-    }
-  ]
-}`
-},
-{
-  role: "user",
-  content: userInput
-}
-
-const rules = `
+    const rules = `
 Rules:
 - Total scene timing must start at 0 and end exactly at ${safeSeconds}.
 - Use between 3 and 7 scenes.
@@ -99,43 +54,69 @@ Rules:
 - Do not invent brand names unless provided.
 - Use English only.
 `;
-    role: "user",
-    content: userInput
-  }
-]
-const prompt = `
+
+    const finalPrompt = `
 Create a short ad video script.
 
-Rules:
-- Total scene timing must start at 0 and end exactly at ${safeSeconds}.
-- Use between 3 and 7 scenes.
-- Keep voiceover natural, engaging, and concise.
-- Do not invent brand names unless provided.
-- Use English only.
+Idea: ${userInput}
+Duration: ${safeSeconds} seconds
+
+${rules}
 `;
 
+    const resp = await fetchFn("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a professional direct-response video ad scriptwriter. Return a clean, ready-to-read ad script with Hook, Problem, Solution, Benefits, and CTA. No markdown. No quotes. Keep it punchy.",
+          },
+          {
+            role: "user",
+            content: finalPrompt,
+          },
+        ],
+        temperature: 0.7,
+      }),
+    });
 
+    const raw = await resp.text();
+    let data;
 
-    const data = await response.json();
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { raw };
+    }
 
-    if (!response.ok) {
-      return res.status(response.status).json({
+    if (!resp.ok) {
+      console.error("OpenAI error:", resp.status, data);
+      return res.status(500).json({
         error: "OpenAI request failed",
+        status: resp.status,
         details: data,
       });
     }
 
-    // ✅ استخراج النص من Responses API
-    const script =
-      (typeof data.output_text === "string" && data.output_text.trim()) ||
-      (data?.output?.[0]?.content
-        ?.find((c) => c?.type === "output_text" && typeof c?.text === "string")
-        ?.text?.trim()) ||
-      "";
+    const out = data?.choices?.[0]?.message?.content?.trim();
 
-    return res.status(200).json({ script });
+    if (!out) {
+      return res.status(500).json({ error: "Empty completion from OpenAI" });
+    }
+
+    return res.status(200).json({
+      text: out,
+      seconds: safeSeconds,
+    });
   } catch (err) {
-    console.error("API /generate error:", err);
+    console.error("API /generate crash:", err);
     return res.status(500).json({
       error: "Internal Server Error",
       message: err?.message || String(err),
