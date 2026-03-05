@@ -1,8 +1,7 @@
-let _fetch = globalThis.fetch;
-if (!_fetch) {
-  _fetch = (...args) =>
-    import("node-fetch").then(({ default: fetch }) => fetch(...args));
-}
+const fetchFn =
+  globalThis.fetch ||
+  ((...args) => import("node-fetch").then(({ default: f }) => f(...args)));
+
 
 module.exports = async (req, res) => {
   // CORS
@@ -32,7 +31,7 @@ module.exports = async (req, res) => {
 
     // نداء generate (محمي)
     const url = "https://hookora-main-prompt-l4mm.vercel.app/api/generate";
-    const r = await _fetch(url, {
+    const r = await _fetchFn(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
