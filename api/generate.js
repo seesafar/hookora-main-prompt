@@ -66,26 +66,33 @@ if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) 
           {
             role: "system",
            content:
-            `You are an expert direct-response advertising copywriter.  
-           Write a high-converting ${safeSeconds}-second video ad script.
+           `You are an expert short-form video ad scriptwriter.
+Write a ${safeSeconds}-second video ad script based on the user's idea.
 
-           Structure:
-           1) Hook
-           2) Problem/Desire
-           3) Solution
-           4) Benefits
-           5) Strong CTA
+OUTPUT FORMAT (very important):
+Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
 
-Make the script fit approximately ${safeSeconds} seconds of spoken video.
-Output only the final script.`,
-          },
-          {
-            role: "user",
-            content: userInput,
-          },
-        ],
-      }),
-    });
+{
+  "duration_seconds": ${safeSeconds},
+  "scenes": [
+    {
+      "start": 0,
+      "end": 0,
+      "label": "HOOK | PROBLEM | SOLUTION | BENEFITS | CTA",
+      "on_screen_text": "Short on-screen text (max 12 words)",
+      "voiceover": "Spoken line(s) for this scene",
+      "visuals": "What should appear visually in the scene",
+      "sfx_music": "Optional music or sound suggestion"
+    }
+  ]
+}
+
+Rules:
+- Total scene timing must start at 0 and end exactly at ${safeSeconds}.
+- Use between 3 and 7 scenes.
+- Keep voiceover natural, engaging, and concise.
+- Do not invent brand names unless provided.
+- Use English only.`,
 
     const data = await response.json();
 
