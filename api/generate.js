@@ -91,14 +91,14 @@ Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
   content: userInput
 }
 
+const rules = `
 Rules:
 - Total scene timing must start at 0 and end exactly at ${safeSeconds}.
 - Use between 3 and 7 scenes.
 - Keep voiceover natural, engaging, and concise.
 - Do not invent brand names unless provided.
-- Use English only.`
-  },
-  {
+- Use English only.
+`;
     role: "user",
     content: userInput
   }
