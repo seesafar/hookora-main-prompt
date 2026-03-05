@@ -1,0 +1,7 @@
+{
+  "name": "hookora-main-prompt",
+  "private": true,
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
