@@ -62,38 +62,42 @@ if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) 
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: [
-          {
-            {
-{
-  role: "system",
-  content: `
-You are an expert short-form video ad scriptwriter.
+       input: [
+  {
+    role: "system",
+    content: `You are an expert short-form video ad scriptwriter.
 Write a ${safeSeconds}-second video ad script based on the user's idea.
 
 OUTPUT FORMAT (very important):
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
 
 {
   "duration_seconds": ${safeSeconds},
   "scenes": [
     {
       "start": 0,
-      "end": 0,
+      "end": ${safeSeconds},
       "label": "HOOK | PROBLEM | SOLUTION | BENEFITS | CTA",
       "on_screen_text": "Short on-screen text (max 12 words)",
       "voiceover": "Spoken line(s) for this scene",
-      "visuals": "What should appear visually",
+      "visuals": "What should appear visually in the scene",
       "sfx_music": "Optional music or sound suggestion"
     }
   ]
 }
-`
-},
-{
-  role: "user",
-  content: userInput
-}
+
+Rules:
+- Total scene timing must start at 0 and end exactly at ${safeSeconds}.
+- Use between 3 and 7 scenes.
+- Keep voiceover natural, engaging, and concise.
+- Do not invent brand names unless provided.
+- Use English only.`
+  },
+  {
+    role: "user",
+    content: userInput
+  }
+]
 Rules:
 - Total scene timing must start at 0 and end exactly at ${safeSeconds}.
 - Use between 3 and 7 scenes.
