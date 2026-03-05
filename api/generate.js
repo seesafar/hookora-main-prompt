@@ -103,20 +103,18 @@ Rules:
     content: userInput
   }
 ]
-Rules:
-- Total scene timing must start at 0 and end exactly at ${safeSeconds}.
-- Use between 3 and 7 scenes.
-- Keep voiceover natural, engaging, and concise.
-- Do not invent brand names unless provided.
-- Use English only.
-`,
+const prompt = `
+Create a short ad video script.
 
 Rules:
 - Total scene timing must start at 0 and end exactly at ${safeSeconds}.
 - Use between 3 and 7 scenes.
 - Keep voiceover natural, engaging, and concise.
 - Do not invent brand names unless provided.
-- Use English only.`,
+- Use English only.
+`;
+
+
 
     const data = await response.json();
 
