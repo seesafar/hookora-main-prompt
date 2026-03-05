@@ -64,11 +64,10 @@ if (!clientKey || String(clientKey).trim() !== String(INTERNAL_API_KEY).trim()) 
         model: "gpt-4.1-mini",
         input: [
           {
-            role: "system",
-           content:
-         content: `
+            {
+  role: "system",
+  content: `
 You are an expert short-form video ad scriptwriter.
-
 Write a ${safeSeconds}-second video ad script based on the user's idea.
 
 OUTPUT FORMAT (very important):
@@ -88,7 +87,8 @@ Return ONLY valid JSON (no markdown, no extra text) with this exact structure:
     }
   ]
 }
-`,
+`
+}
 
 Rules:
 - Total scene timing must start at 0 and end exactly at ${safeSeconds}.
