@@ -10,8 +10,11 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { idea, prompt } = req.body || {};
+    const { idea, prompt, seconds } = req.body || {};
     const userInput = (prompt || idea || "").trim();
+    // ✅ seconds اختيارية (من 5 إلى 45)
+    const s = Number(seconds);
+    const safeSeconds = Number.isFinite(s) ? Math.min(45, Math.max(5, s)) : 30;
     if (!userInput) return res.status(400).json({ error: "No prompt provided" });
 
     // 🔐 المفتاح يبقى في Vercel فقط
@@ -31,7 +34,7 @@ module.exports = async (req, res) => {
         "Content-Type": "application/json",
         "x-api-key": INTERNAL_API_KEY
       },
-      body: JSON.stringify({ idea: userInput })
+      body: JSON.stringify({ idea: userInput, seconds: safeSeconds })
     });
 
     const data = await r.json().catch(() => ({}));
