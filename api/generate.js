@@ -46,22 +46,77 @@ module.exports = async (req, res) => {
     const s = Number(seconds);
     const safeSeconds = Number.isFinite(s) ? Math.min(45, Math.max(5, s)) : 30;
 
-    const rules = `
+    const systemPrompt = `
+You are an expert AI advertising strategist and short-form video ad planner.
+
+The user may write their product idea in Arabic or English.
+You must understand the user's idea in either language, but ALWAYS produce the final output in ENGLISH only.
+
+Your job is to generate a structured vertical video ad plan for a 9:16 social media ad.
+
+Return ONLY valid JSON.
+Do not wrap the JSON in markdown.
+Do not add explanations before or after the JSON.
+
 Rules:
-- Total scene timing must start at 0 and end exactly at ${safeSeconds}.
-- Use between 3 and 7 scenes.
-- Keep voiceover natural, engaging, and concise.
-- Do not invent brand names unless provided.
-- Use English only.
+- final_language must always be "English"
+- detected_input_language must be either "Arabic", "English", or "Mixed"
+- ad_type must be "vertical_short_video_ad"
+- target_format must be "9:16"
+- total_seconds must match the requested duration exactly
+- create between 3 and 7 scenes depending on duration
+- scenes must feel like a real ad, not a story
+- every scene must include:
+  - scene_number
+  - start_second
+  - end_second
+  - visual
+  - voiceover
+  - text_overlay
+- voiceover must be natural, persuasive, and concise
+- text_overlay must be short and marketing-friendly
+- include one music_mood string suitable for the ad
+- include one hook string
+- include one CTA string
+- do not invent fake technical specs unless clearly implied by the user
+- keep the ad commercially useful and realistic
+
+Return JSON with exactly this structure:
+{
+  "detected_input_language": "Arabic",
+  "final_language": "English",
+  "ad_type": "vertical_short_video_ad",
+  "target_format": "9:16",
+  "total_seconds": 10,
+  "product_summary_en": "short English summary",
+  "hook": "short hook",
+  "music_mood": "short music direction",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "start_second": 0,
+      "end_second": 2,
+      "visual": "visual direction",
+      "voiceover": "voiceover line",
+      "text_overlay": "short text overlay"
+    }
+  ],
+  "cta": "short CTA"
+}
 `;
 
-    const finalPrompt = `
-Create a short ad video script.
+    const userPrompt = `
+User idea:
+${userInput}
 
-Idea: ${userInput}
-Duration: ${safeSeconds} seconds
+Requested ad duration:
+${safeSeconds} seconds
 
-${rules}
+Create a commercially strong short video ad plan.
+Remember:
+- Input may be Arabic or English
+- Output must be ENGLISH only
+- Return ONLY valid JSON
 `;
 
     const resp = await fetchFn("https://api.openai.com/v1/chat/completions", {
@@ -72,18 +127,12 @@ ${rules}
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
         messages: [
-          {
-            role: "system",
-            content:
-              "You are a professional direct-response video ad scriptwriter. Return a clean, ready-to-read ad script with Hook, Problem, Solution, Benefits, and CTA. No markdown. No quotes. Keep it punchy.",
-          },
-          {
-            role: "user",
-            content: finalPrompt,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
         ],
-        temperature: 0.7,
+        temperature: 0.7
       }),
     });
 
@@ -105,16 +154,25 @@ ${rules}
       });
     }
 
-    const out = data?.choices?.[0]?.message?.content?.trim();
+    const content = data?.choices?.[0]?.message?.content?.trim();
 
-    if (!out) {
+    if (!content) {
       return res.status(500).json({ error: "Empty completion from OpenAI" });
     }
 
-    return res.status(200).json({
-      text: out,
-      seconds: safeSeconds,
-    });
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (err) {
+      console.error("JSON parse error from model output:", content);
+      return res.status(500).json({
+        error: "Model returned invalid JSON",
+        message: err?.message || String(err),
+        raw: content,
+      });
+    }
+
+    return res.status(200).json(parsed);
   } catch (err) {
     console.error("API /generate crash:", err);
     return res.status(500).json({
