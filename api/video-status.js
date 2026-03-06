@@ -25,12 +25,11 @@ module.exports = async (req, res) => {
     }
 
     const FAL_API_KEY = process.env.FAL_API_KEY;
-
     if (!FAL_API_KEY) {
       return res.status(500).json({ error: "Missing FAL_API_KEY in env" });
     }
 
-    const statusResp = await fetchFn(
+    const falResp = await fetchFn(
       `https://queue.fal.run/fal-ai/kling-video/v2.6/pro/text-to-video/requests/${requestId}`,
       {
         method: "GET",
@@ -40,42 +39,37 @@ module.exports = async (req, res) => {
       }
     );
 
-    const raw = await statusResp.text();
+    const raw = await falResp.text();
 
-    let resultData;
+    let payload;
     try {
-      resultData = JSON.parse(raw);
+      payload = JSON.parse(raw);
     } catch {
-      resultData = { raw };
-    }
-
-    if (!statusResp.ok) {
-      console.error("Fal status error:", statusResp.status, resultData);
-      return res.status(statusResp.status).json({
-        error: "Fal status request failed",
-        status: statusResp.status,
-        details: resultData
-      });
+      payload = { raw };
     }
 
     const status =
-      resultData?.status ||
-      resultData?.request?.status ||
+      payload?.status ||
+      payload?.request?.status ||
+      payload?.response?.status ||
       "UNKNOWN";
 
     const videoUrl =
-      resultData?.video?.url ||
-      resultData?.data?.video?.url ||
-      resultData?.data?.videos?.[0]?.url ||
-      resultData?.output?.video_url ||
-      resultData?.output?.video?.url ||
+      payload?.video?.url ||
+      payload?.data?.video?.url ||
+      payload?.data?.videos?.[0]?.url ||
+      payload?.output?.video_url ||
+      payload?.output?.video?.url ||
+      payload?.response?.video?.url ||
       null;
 
     return res.status(200).json({
+      ok: falResp.ok,
+      fal_status_code: falResp.status,
       status,
       request_id: requestId,
       video_url: videoUrl,
-      raw: resultData
+      details: payload
     });
   } catch (error) {
     console.error("video-status crash:", error);
