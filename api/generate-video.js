@@ -30,8 +30,8 @@ module.exports = async (req, res) => {
     }
 
     const safeSeconds = Number.isFinite(Number(seconds))
-      ? Math.min(10, Math.max(5, Number(seconds)))
-      : 10;
+      ? Math.min(10, Math.max(2, Number(seconds)))
+      : 5;
 
     const response = await fetchFn("https://api.runwayml.com/v1/text_to_video", {
       method: "POST",
@@ -41,9 +41,10 @@ module.exports = async (req, res) => {
         "X-Runway-Version": "2024-11-06"
       },
       body: JSON.stringify({
-        prompt: userInput,
-        duration: safeSeconds,
-        ratio: "9:16"
+        model: "gen4.5",
+        promptText: userInput,
+        ratio: "720:1280",
+        duration: safeSeconds
       })
     });
 
@@ -65,6 +66,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Runway يرجع task id أولاً
     return res.status(200).json(data);
   } catch (error) {
     console.error("generate-video crash:", error);
