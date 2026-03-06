@@ -3,9 +3,10 @@ const fetchFn =
   ((...args) => import("node-fetch").then(({ default: f }) => f(...args)));
 
 module.exports = async (req, res) => {
+
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -15,14 +16,8 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "Method not allowed. Use GET." });
   }
 
+  try {
 
-    // مفتاح Fal
-    const FAL_API_KEY = process.env.FAL_API_KEY;
-    if (!FAL_API_KEY) {
-      return res.status(500).json({ error: "Missing FAL_API_KEY in env" });
-    }
-
-    // نقرأ request_id بدل taskId
     const requestId = String(
       req.query.request_id || req.query.requestId || ""
     ).trim();
@@ -31,45 +26,13 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "Missing request_id" });
     }
 
-    // 1) نفحص الحالة
+    const FAL_API_KEY = process.env.FAL_API_KEY;
+
+    if (!FAL_API_KEY) {
+      return res.status(500).json({ error: "Missing FAL_API_KEY in env" });
+    }
+
     const statusResp = await fetchFn(
-      `https://queue.fal.run/fal-ai/kling-video/v2.6/pro/text-to-video/requests/${requestId}/status?logs=1`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Key ${FAL_API_KEY}`
-        }
-      }
-    );
-
-    const statusRaw = await statusResp.text();
-    let statusData;
-
-    try {
-      statusData = JSON.parse(statusRaw);
-    } catch {
-      statusData = { raw: statusRaw };
-    }
-
-    if (!statusResp.ok) {
-      return res.status(statusResp.status).json({
-        error: "Fal status request failed",
-        status: statusResp.status,
-        details: statusData
-      });
-    }
-
-    // إذا لم يكتمل بعد، نرجّع الحالة كما هي
-    if (statusResp.status === 202 || statusData?.status !== "COMPLETED") {
-      return res.status(200).json({
-        status: statusData?.status || "IN_PROGRESS",
-        request_id: requestId,
-        details: statusData
-      });
-    }
-
-    // 2) إذا اكتمل، نجيب النتيجة النهائية
-    const resultResp = await fetchFn(
       `https://queue.fal.run/fal-ai/kling-video/v2.6/pro/text-to-video/requests/${requestId}`,
       {
         method: "GET",
@@ -79,37 +42,32 @@ module.exports = async (req, res) => {
       }
     );
 
-    const resultRaw = await resultResp.text();
-    let resultData;
+    const raw = await statusResp.text();
 
+    let data;
     try {
-      resultData = JSON.parse(resultRaw);
+      data = JSON.parse(raw);
     } catch {
-      resultData = { raw: resultRaw };
+      data = { raw };
     }
 
-    if (!resultResp.ok) {
-      return res.status(resultResp.status).json({
-        error: "Fal result request failed",
-        status: resultResp.status,
-        details: resultData
+    if (!statusResp.ok) {
+      return res.status(statusResp.status).json({
+        error: "Fal status request failed",
+        status: statusResp.status,
+        details: data
       });
     }
 
-    return res.status(200).json({
-      status: "COMPLETED",
-      request_id: requestId,
-      result: resultData,
-      video_url:
-        resultData?.video?.url ||
-        resultData?.data?.video?.url ||
-        resultData?.data?.videos?.[0]?.url ||
-        null
-    });
+    return res.status(200).json(data);
+
   } catch (error) {
+
     return res.status(500).json({
       error: "Internal Server Error",
       details: error?.message || String(error)
     });
+
   }
+
 };
