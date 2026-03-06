@@ -33,7 +33,7 @@ module.exports = async (req, res) => {
       ? Math.min(10, Math.max(2, Number(seconds)))
       : 5;
 
-    const response = await fetchFn("https://api.runwayml.com/v1/text_to_video", {
+    const response = await fetchFn("https://api.runwayml.com/v1/video", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${runwayKey}`,
