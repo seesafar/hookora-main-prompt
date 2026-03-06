@@ -52,12 +52,14 @@ module.exports = async (req, res) => {
     }
 
     if (!statusResp.ok) {
-      return res.status(statusResp.status).json({
-        error: "Fal status request failed",
-        status: statusResp.status,
-        details: data
-      });
-    }
+  console.error("Fal status error:", statusResp.status, statusData);
+  return res.status(statusResp.status).json({
+    error: "Fal status request failed",
+    status: statusResp.status,
+    details: statusData,
+    debug: statusData
+  });
+}
 
     return res.status(200).json(data);
 
