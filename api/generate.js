@@ -80,7 +80,11 @@ Rules:
 - include one CTA string
 - do not invent fake technical specs unless clearly implied by the user
 - keep the ad commercially useful and realistic
-
+- Never change the product category.
+- If the user mentions watches, the output must remain about watches.
+- If the user mentions a projector, the output must remain about a projector.
+- Do not replace the user's product with another product.
+- Stay strictly faithful to the user's original product idea.
 Return JSON with exactly this structure:
 {
   "detected_input_language": "Arabic",
@@ -117,6 +121,7 @@ Remember:
 - Input may be Arabic or English
 - Output must be ENGLISH only
 - Return ONLY valid JSON
+Stay strictly faithful to the exact product mentioned by the user. Do not substitute it with another product category.
 `;
 
     const resp = await fetchFn("https://api.openai.com/v1/chat/completions", {
