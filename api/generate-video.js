@@ -33,20 +33,23 @@ module.exports = async (req, res) => {
       ? Math.min(10, Math.max(2, Number(seconds)))
       : 5;
 
-    const response = await fetchFn("https://api.runwayml.com/v1/video", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${runwayKey}`,
-        "Content-Type": "application/json",
-        "X-Runway-Version": "2024-11-06"
-      },
-      body: JSON.stringify({
-        model: "gen4.5",
-        promptText: userInput,
-        ratio: "720:1280",
-        duration: safeSeconds
-      })
-    });
+   const response = await fetchFn("https://api.runwayml.com/v1/tasks", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${runwayKey}`,
+    "Content-Type": "application/json",
+    "X-Runway-Version": "2024-11-06"
+  },
+  body: JSON.stringify({
+    taskType: "text_to_video",
+    model: "gen4",
+    input: {
+      promptText: userInput,
+      duration: safeSeconds,
+      ratio: "720:1280"
+    }
+  })
+});
 
     const raw = await response.text();
     let data;
