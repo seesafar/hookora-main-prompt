@@ -3,10 +3,9 @@ const fetchFn =
   ((...args) => import("node-fetch").then(({ default: f }) => f(...args)));
 
 module.exports = async (req, res) => {
-
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -17,49 +16,112 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // حماية داخلية
+    const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+    const clientKey = req.headers["x-api-key"];
 
-    const taskId = String(req.query.taskId || "").trim();
-
-    if (!taskId) {
-      return res.status(400).json({ error: "Missing taskId" });
+    if (!INTERNAL_API_KEY) {
+      return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
     }
 
-    const runwayKey = process.env.RUNWAY_API_KEY;
+    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    const response = await fetchFn(`https://api.runwayml.com/v1/tasks/${taskId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${runwayKey}`,
-        "X-Runway-Version": "2024-11-06"
+    // مفتاح Fal
+    const FAL_API_KEY = process.env.FAL_API_KEY;
+    if (!FAL_API_KEY) {
+      return res.status(500).json({ error: "Missing FAL_API_KEY in env" });
+    }
+
+    // نقرأ request_id بدل taskId
+    const requestId = String(
+      req.query.request_id || req.query.requestId || ""
+    ).trim();
+
+    if (!requestId) {
+      return res.status(400).json({ error: "Missing request_id" });
+    }
+
+    // 1) نفحص الحالة
+    const statusResp = await fetchFn(
+      `https://queue.fal.run/fal-ai/kling-video/v2.6/pro/text-to-video/requests/${requestId}/status?logs=1`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Key ${FAL_API_KEY}`
+        }
       }
-    });
+    );
 
-    const raw = await response.text();
-    let data;
+    const statusRaw = await statusResp.text();
+    let statusData;
 
     try {
-      data = JSON.parse(raw);
+      statusData = JSON.parse(statusRaw);
     } catch {
-      data = { raw };
+      statusData = { raw: statusRaw };
     }
 
-    if (!response.ok) {
-      return res.status(500).json({
-        error: "Runway status request failed",
-        status: response.status,
-        details: data
+    if (!statusResp.ok) {
+      return res.status(statusResp.status).json({
+        error: "Fal status request failed",
+        status: statusResp.status,
+        details: statusData
       });
     }
 
-    return res.status(200).json(data);
+    // إذا لم يكتمل بعد، نرجّع الحالة كما هي
+    if (statusResp.status === 202 || statusData?.status !== "COMPLETED") {
+      return res.status(200).json({
+        status: statusData?.status || "IN_PROGRESS",
+        request_id: requestId,
+        details: statusData
+      });
+    }
 
+    // 2) إذا اكتمل، نجيب النتيجة النهائية
+    const resultResp = await fetchFn(
+      `https://queue.fal.run/fal-ai/kling-video/v2.6/pro/text-to-video/requests/${requestId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Key ${FAL_API_KEY}`
+        }
+      }
+    );
+
+    const resultRaw = await resultResp.text();
+    let resultData;
+
+    try {
+      resultData = JSON.parse(resultRaw);
+    } catch {
+      resultData = { raw: resultRaw };
+    }
+
+    if (!resultResp.ok) {
+      return res.status(resultResp.status).json({
+        error: "Fal result request failed",
+        status: resultResp.status,
+        details: resultData
+      });
+    }
+
+    return res.status(200).json({
+      status: "COMPLETED",
+      request_id: requestId,
+      result: resultData,
+      video_url:
+        resultData?.video?.url ||
+        resultData?.data?.video?.url ||
+        resultData?.data?.videos?.[0]?.url ||
+        null
+    });
   } catch (error) {
-
     return res.status(500).json({
       error: "Internal Server Error",
       details: error?.message || String(error)
     });
-
   }
-
 };
