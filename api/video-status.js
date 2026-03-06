@@ -15,18 +15,6 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "Method not allowed. Use GET." });
   }
 
-  try {
-    // حماية داخلية
-    const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
-    const clientKey = req.headers["x-api-key"];
-
-    if (!INTERNAL_API_KEY) {
-      return res.status(500).json({ error: "Missing INTERNAL_API_KEY in env" });
-    }
-
-    if (!clientKey || clientKey !== INTERNAL_API_KEY) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     // مفتاح Fal
     const FAL_API_KEY = process.env.FAL_API_KEY;
